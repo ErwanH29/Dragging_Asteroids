@@ -21,8 +21,14 @@ class vec{
             std::cout << array[2] << std::endl;
         }
 
-        double &operator[](int i){
+        double & operator [](int i){ // Overload [] operator
             return array[i];
+        }
+
+        double operator *(vec other){  // Dot product
+            return array[0]*other[0] 
+              + array[1]*other[1] 
+              + array[2]*other[2];
         }
 };
 
