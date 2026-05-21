@@ -20,16 +20,42 @@ class vec{
             std::cout << array[1] << " ";
             std::cout << array[2] << std::endl;
         }
+        
+        // Overloading operators for vector operations
+        // return_type operator<symbol>(arguments) const_optional {
+        //     implementation
+        //  }
 
-        double & operator [](int i){ // Overload [] operator
+        double& operator[](int i){ // Modification operator
             return array[i];
         }
 
-        double operator *(vec other){  // Dot product
+        const double& operator[](int i) const { // Read-only operator
+            return array[i];
+        }
+
+        double operator*(const vec& other) {
             return array[0]*other[0] 
               + array[1]*other[1] 
               + array[2]*other[2];
         }
+
+        inline vec operator-(const vec& other) const {
+            return vec(
+                array[0] - other[0],
+                array[1] - other[1],
+                array[2] - other[2]
+            );
+        }
+
+        inline vec operator*(double scalar) const {
+            return vec(
+                scalar * array[0],
+                scalar * array[1],
+                scalar * array[2]
+            );
+        }
+
 };
 
 #endif
