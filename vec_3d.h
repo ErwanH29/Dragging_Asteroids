@@ -7,9 +7,10 @@
 
 class vec{
     private:
-        double array[3];
+        double array[3];  // The actual variable.
+
     public:
-        vec(double x, double y, double z){
+        vec(double x, double y, double z){  // Constructor
             array[0] = x;
             array[1] = y;
             array[2] = z;
@@ -25,12 +26,11 @@ class vec{
         // return_type operator<symbol>(arguments) const_optional {
         //     implementation
         //  }
-
-        double& operator[](int i){ // Modification operator
+        inline double& operator[](int i){ // Modification operator
             return array[i];
         }
 
-        const double& operator[](int i) const { // Read-only operator
+        inline const double& operator[](int i) const { // Read-only operator
             return array[i];
         }
 

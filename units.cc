@@ -5,10 +5,10 @@ UnitSystem units;
 void set_units(double mass_unit_si, double length_unit_si){
     units.mass = mass_unit_si;
     units.length = length_unit_si;
-
     units.time = std::sqrt(
         units.length * units.length * units.length / (G_si * units.mass)
     );
+
     units.velocity = units.length / units.time;
     units.energy = units.mass * units.velocity * units.velocity;
 }

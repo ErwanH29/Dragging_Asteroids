@@ -15,6 +15,8 @@ integer fraction of orbital period (numerical round off).
 #include <chrono>
 #include <cmath>
 #include <vector>
+
+#include "orbital_elements.h"
 #include "units.h"
 #include "vec_3d.h"
 
@@ -27,6 +29,7 @@ const int NDIM = 3;
 static const double eps2 = 0.0;
 static dyn_arr<double> mass, pot, radius;
 static dyn_arr<vec> acc, pos, vel;
+
 
 
 void set_nb_units(){
@@ -48,8 +51,7 @@ void set_nb_units(){
     set_units(mass_units, length_units);
 };
 
-
-void convert_particles_to_nb(){
+void convert_si_attr_to_nb(){
     int nparticles = radius.size();
     for (int i=0; i<nparticles; i++){
         mass[i] = mass_si_to_nb(mass[i]);
@@ -58,7 +60,6 @@ void convert_particles_to_nb(){
         vel[i] = vel[i] * (1.0 / units.velocity);
     }
 }
-
 
 int new_particle( 
     double _radius,
@@ -78,10 +79,9 @@ int new_particle(
 
 
 double get_energy(){
-    int Nparticles = radius.size();
     double ke = 0.0;
     double pe = 0.0;
-    for (int i=0; i<Nparticles; i++){
+    for (int i=0; i<radius.size(); i++){
         double mass_i = mass[i];
         if (mass_i <= _TINY_) continue;
         double vel2 = vel[i] * vel[i];  // Using overloaded * operator
@@ -93,18 +93,19 @@ double get_energy(){
 
 
 int get_acc_pot_coll(){
-    int Nparticles = radius.size();
-    for (int i=0; i<Nparticles; i++){
-        acc[i] = vec(0.0, 0.0, 0.0);
+    int nparticles = radius.size();
+    vec zero_vec = vec(0.0, 0.0, 0.0);
+    for (int i=0; i<nparticles; i++){
+        acc[i] = zero_vec;
         pot[i] = 0.0;
     }
 
-    for (int i=0; i<Nparticles; i++){
+    for (int i=0; i<nparticles; i++){
         vec pos_i = pos[i];
         vec vel_i = vel[i];
         double mass_i = mass[i];
         double rad_i = radius[i];
-        for (int j=i+1; j<Nparticles; j++){
+        for (int j=i+1; j<nparticles; j++){ // Current symmetric scheme can't be parallelised
             double mass_j = mass[j];
             // Test particles don't affect one another
             if ((mass_j <= _TINY_) && (mass_i <= _TINY_)){
@@ -117,8 +118,7 @@ int get_acc_pot_coll(){
             vec vij = vel_i - vel_j;
             double dr2 = rij * rij;
             double coll_rad = rad_i + radius[j];
-            if (dr2 <= coll_rad * coll_rad){
-                // Handle collision (not yet implemented)
+            if (dr2 <= coll_rad * coll_rad){  // Handle collision (not yet implemented)
                 continue;
             }
 
@@ -149,17 +149,17 @@ int get_acc_pot_coll(){
 
 
 int leapfrog_kdk(double time_step){
-    int Nparticles = radius.size();
+    int nparticles = radius.size();
 
     // 1/2 kick step
-    for (int i=0; i<Nparticles; i++){
+    for (int i=0; i<nparticles; i++){
         for (int k=0; k<NDIM; k++){
             vel[i][k] += 0.5 * time_step * acc[i][k];
         }
     }
 
     // drift step
-    for (int i=0; i<Nparticles; i++){
+    for (int i=0; i<nparticles; i++){
         for (int k=0; k<NDIM; k++){
             pos[i][k] += time_step * vel[i][k];
         }
@@ -167,7 +167,7 @@ int leapfrog_kdk(double time_step){
 
     // 2/2 kick step
     get_acc_pot_coll();  // Update acc.
-    for (int i=0; i<Nparticles; i++){
+    for (int i=0; i<nparticles; i++){
         for (int k=0; k<NDIM; k++){
             vel[i][k] += 0.5 * time_step * acc[i][k];
         }
@@ -194,7 +194,7 @@ int main(){
     );
 
     set_nb_units();
-    convert_particles_to_nb();
+    convert_si_attr_to_nb();
 
     double time = 0.0;
     const double end_time_si = 10000.0 * 3600 * 24 * 365.25;  // 100 years
@@ -210,6 +210,19 @@ int main(){
     std::cout << "ENERGY_UNIT: " << units.energy << " J" << std::endl;
     std::cout << "TIME_UNIT: " << units.time << " s" << std::endl;
     std::cout << time << " " << end_time_nb << std::endl;
+
+    const double initial_ecc = get_ecc(
+        mass[p1], mass[p2], 
+        pos[p1], pos[p2], 
+        vel[p1], vel[p2]
+    );
+    const double initial_sma = get_sma(
+        mass[p1], mass[p2], 
+        pos[p1], pos[p2], 
+        vel[p1], vel[p2]
+    );
+    std::cout << "Initial eccentricity: " << initial_ecc << std::endl;
+    std::cout << "Initial sma: " << initial_sma * units.length / 1.5e11 << " au" << std::endl;
 
     auto t1 = std::chrono::high_resolution_clock::now();
     while (time<end_time_nb){
@@ -228,5 +241,18 @@ int main(){
     std::cout << "dE: " << (total_energy - initial_energy) / initial_energy << std::endl;
     std::cout << "Time taken: " << std::chrono::duration_cast<std::chrono::milliseconds>(t2-t1).count() << " ms" << std::endl;
 
+
+    const double final_ecc = get_ecc(
+        mass[p1], mass[p2], 
+        pos[p1], pos[p2], 
+        vel[p1], vel[p2]
+    );
+    const double final_sma = get_sma(
+        mass[p1], mass[p2], 
+        pos[p1], pos[p2], 
+        vel[p1], vel[p2]
+    );
+    std::cout << "Final eccentricity: " << final_ecc << std::endl;
+    std::cout << "Final sma: " << final_sma * units.length / 1.5e11 << " au" << std::endl;
     return 0;
 }
