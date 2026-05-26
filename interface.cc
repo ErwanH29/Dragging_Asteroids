@@ -35,13 +35,16 @@ Available integrator_choices:
 int main(){
     double M_si = 2.0e30;  // Mass of the sun
     double r_si = 1.5e11;  // 1 AU
-    int integrator_choice = 2;
+    int integrator_choice = 3;
 
     NBodySystem system;
-    if (integrator_choice!=1 && integrator_choice!=2){
+    if (integrator_choice!=1 && integrator_choice!=2 && integrator_choice!=3){
         std::cout << "Invalid integrator choice. Current choices are 1, 2, and 3." << std::endl;
         return -1;
     }
+
+    system.set_eps2(0.0);
+    system.set_mass_threshold(pow(2.0, -17.0));
 
     int p1 = system.new_particle(
         1.0, M_si, 
@@ -54,7 +57,7 @@ int main(){
         0.0, sqrt(G_si * M_si / r_si), 0.0
     );
 
-    for (int i=0; i<10; i++){
+    for (int i=0; i<100; i++){
         double r = (0.9 + i/2000.0) * r_si;
         int p = system.new_particle(
             1.0, pow(2.0, -16.0), 

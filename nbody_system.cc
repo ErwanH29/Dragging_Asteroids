@@ -191,58 +191,56 @@ int NBodySystem::yoshida_fourth_order(double time_step){
     // Coefficients from 1990PhLA..150..262Y
     static const double w0 = -cbrt(2.0) / (2.0 - cbrt(2.0));
     static const double w1 = 1.0 / (2.0 - cbrt(2.0));
-    static const double c1 = w1 / 2.0;
-    static const double c2 = (w0 + w1) / (2.0);
-    static const double c3 = (w0 + w1) / (2.0);
+
+    static const double c1 = 0.5 * w1;
+    static const double c2 = 0.5 * (w0 + w1);
+    static const double c3 = 0.5 * (w0 + w1);
     static const double c4 = w1 / 2.0;
     static const double d1 = w1;
     static const double d2 = w0;
     static const double d3 = w1;
 
     int nparticles = size();
-    for (int i=0; i<nparticles; i++){
-        for (int k=0; k<NDIM; k++){
-            pos[i][k] += c1 * time_step * vel[i][k];
-        }
-    }
+    drift(c1 * time_step);
+    
+    update_gravity();
+    kick(d1 * time_step);
+    drift(c2 * time_step);
 
     update_gravity();
-    for (int i=0; i<nparticles; i++){
-        for (int k=0; k<NDIM; k++){
-            vel[i][k] += d1 * time_step * acc[i][k];
-        }
-    }
-    for (int i=0; i<nparticles; i++){
-        for (int k=0; k<NDIM; k++){
-            pos[i][k] += c2 * time_step * vel[i][k];
-        }
-    }
+    kick(d2 * time_step);
+    drift(c3 * time_step);
 
     update_gravity();
-    for (int i=0; i<nparticles; i++){
-        for (int k=0; k<NDIM; k++){
-            vel[i][k] += d2 * time_step * acc[i][k];
-        }
-    }
-    for (int i=0; i<nparticles; i++){
-        for (int k=0; k<NDIM; k++){
-            pos[i][k] += c3 * time_step * vel[i][k];
-        }
-    }
-
-    update_gravity();
-    for (int i=0; i<nparticles; i++){
-        for (int k=0; k<NDIM; k++){
-            vel[i][k] += d3 * time_step * acc[i][k];
-        }
-    }
-    for (int i=0; i<nparticles; i++){
-        for (int k=0; k<NDIM; k++){
-            pos[i][k] += c4 * time_step * vel[i][k];
-        }
-    }
+    kick(d3 * time_step);
+    drift(c4 * time_step);
 
     return 0;
 }
 
+int NBodySystem::yoshida_eighth_order(double time_step){
+    // Coefficients from 1990PhLA..150..262Y
+    static constexpr double w1 = -1.61582374150097;
+    static constexpr double w2 = -2.44699182370524;
+    static constexpr double w3 = -0.00716989419708120;
+    static constexpr double w4 = 2.44002732616735;
+    static constexpr double w5 = 0.157739928123617;
+    static constexpr double w6 = 1.82020630970714;
+    static constexpr double w7 = 1.04242620869991;
+    static constexpr double w0 = 1.0 - 2.0 * (w1 + w2 + w3 + w4 + w5 + w6 + w7);
 
+    static constexpr double w_seq[15] = {
+        w7, w6, w5, w4, w3, w2, w1, w0, w1, w2, w3, w4, w5, w6, w7
+    };
+
+    for (int i = 0; i < 15; i++) {
+        drift(0.5 * w_seq[i] * time_step);
+
+        update_gravity();
+        kick(w_seq[i] * time_step);
+
+        drift(0.5 * w_seq[i] * time_step);
+    }
+
+    return 0;
+}
