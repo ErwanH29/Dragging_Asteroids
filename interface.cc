@@ -1,6 +1,6 @@
 /* 
-Symplectic integrator with 1st, 2nd, 3rd and 4th
-order schemes. Symplectic integrators preserve
+Symplectic integrator_choice with 1st, 2nd, 3rd and 4th
+order schemes. Symplectic integrator_choices preserve
 energy error over secular times, however across
 an orbital period some error does arise. 
 
@@ -10,6 +10,15 @@ This error can be reduced further by making it an
 integer fraction of the numerical orbital period, 
 and further reduced by making this a power of two 
 integer fraction of orbital period (numerical round off).
+
+NOTE: double is better for array and heavier objects, use
+double otherwise.
+
+Available integrator_choices:
+    - Second-order verlet leapfrog method       22/05/2026
+    - Fourth-order Yoshida integrator_choice
+    - Eighth-order Yoshida integrator_choice
+    - Wisdam-Holman + Bulirsch-Stoer
 */
 
 #include <chrono>
@@ -22,13 +31,18 @@ integer fraction of orbital period (numerical round off).
 
 #define _TINY_ pow(2.0, -52.0)
 
+
+
 template <typename T>
 using dyn_arr = std::vector<T>;
-
-const int NDIM = 3;
-static const double eps2 = 0.0;
 static dyn_arr<double> mass, pot, radius;
+static dyn_arr<int> type;
 static dyn_arr<vec> acc, pos, vel;
+
+constexpr int NDIM = 3;  // Known at compile time
+static int integrator_choice = 2;
+static double eps2 = 0.0;  // only interface.cc can use it, but global
+static double MASS_THRESHOLD = pow(2.0, -10.0);
 
 
 
@@ -39,9 +53,7 @@ void set_nb_units(){
     for (int i=0; i<nparticles; i++){
         mass_units += mass[i];
         for (int j=i+1; j<nparticles; j++){
-            vec pos_i = pos[i];
-            vec pos_j = pos[j];
-            vec drij = pos_i - pos_j;  // Using overloaded - operator
+            vec drij = pos[i] - pos[j];  // Using overloaded - operator
             double dr = sqrt(drij * drij);
             if (dr > length_units){
                 length_units = dr;
@@ -61,23 +73,6 @@ void convert_si_attr_to_nb(){
     }
 }
 
-int new_particle( 
-    double _radius,
-    double _mass, 
-    double x, double y, double z, 
-    double vx, double vy, double vz
-){
-    int id = radius.size();
-    mass.push_back(_mass);
-    radius.push_back(_radius);
-    pos.push_back(vec(x, y, z));
-    vel.push_back(vec(vx, vy, vz));
-    acc.push_back(vec(0.0, 0.0, 0.0));
-    pot.push_back(0.0);
-    return id;
-};
-
-
 double get_energy(){
     double ke = 0.0;
     double pe = 0.0;
@@ -86,36 +81,63 @@ double get_energy(){
         if (mass_i <= _TINY_) continue;
         double vel2 = vel[i] * vel[i];  // Using overloaded * operator
         ke += 0.5 * mass_i * vel2;
-        pe -= 0.5 * G * mass_i * pot[i];
+        pe += 0.5 * mass_i * pot[i];
     }
     return ke + pe;
 };
 
 
+int new_particle( 
+    double _radius,
+    double _mass, 
+    double x, 
+    double y, 
+    double z, 
+    double vx, 
+    double vy, 
+    double vz
+){
+    int id = radius.size();
+    static const vec null_acc = vec(0.0, 0.0, 0.0);
+
+    mass.push_back(_mass);
+    radius.push_back(_radius);
+    pos.push_back(vec(x, y, z));
+    vel.push_back(vec(vx, vy, vz));
+    acc.push_back(null_acc);
+    pot.push_back(0.0);
+    if (_mass >= MASS_THRESHOLD){
+        type.push_back(1);
+    } else {
+        type.push_back(0);
+    }
+    return id;
+};
+
+
 int get_acc_pot_coll(){
     int nparticles = radius.size();
-    vec zero_vec = vec(0.0, 0.0, 0.0);
+    static vec zero_vec = vec(0.0, 0.0, 0.0);  // Initialised at first call, and remembered throughout
     for (int i=0; i<nparticles; i++){
         acc[i] = zero_vec;
         pot[i] = 0.0;
     }
 
     for (int i=0; i<nparticles; i++){
-        vec pos_i = pos[i];
-        vec vel_i = vel[i];
+        const vec& pos_i = pos[i];
+        const vec& vel_i = vel[i];
         double mass_i = mass[i];
         double rad_i = radius[i];
-        for (int j=i+1; j<nparticles; j++){ // Current symmetric scheme can't be parallelised
+        int type_i = type[i];
+        for (int j=i+1; j<nparticles; j++){  // Current symmetric scheme can't be parallelised
             double mass_j = mass[j];
             // Test particles don't affect one another
-            if ((mass_j <= _TINY_) && (mass_i <= _TINY_)){
+            if ((type_i == 0) && (type[j] == 0)){
                 continue;
             }
 
-            vec pos_j = pos[j];
-            vec vel_j = vel[j];
-            vec rij = pos_i - pos_j;  // Using overloaded - operator
-            vec vij = vel_i - vel_j;
+            vec rij = pos_i - pos[j];  // Using overloaded - operator
+            vec vij = vel_i - vel[j];
             double dr2 = rij * rij;
             double coll_rad = rad_i + radius[j];
             if (dr2 <= coll_rad * coll_rad){  // Handle collision (not yet implemented)
@@ -148,39 +170,32 @@ int get_acc_pot_coll(){
 };
 
 
-int leapfrog_kdk(double time_step){
+int kick(double time_step){
     int nparticles = radius.size();
-
-    // 1/2 kick step
     for (int i=0; i<nparticles; i++){
         for (int k=0; k<NDIM; k++){
-            vel[i][k] += 0.5 * time_step * acc[i][k];
+            vel[i][k] += time_step * acc[i][k];
         }
     }
-
-    // drift step
-    for (int i=0; i<nparticles; i++){
-        for (int k=0; k<NDIM; k++){
-            pos[i][k] += time_step * vel[i][k];
-        }
-    }
-
-    // 2/2 kick step
-    get_acc_pot_coll();  // Update acc.
-    for (int i=0; i<nparticles; i++){
-        for (int k=0; k<NDIM; k++){
-            vel[i][k] += 0.5 * time_step * acc[i][k];
-        }
-    }
-
     return 0;
 }
 
 
 int main(){
-    double M_si = 2e30;                // Mass of the sun
-    double r_si = 1.5e11;              // 1 AU
-    double vorb_si = sqrt(G_si * M_si / r_si);  // Orbital velocity
+    double M_si = 2.0e30;  // Mass of the sun
+    double r_si = 1.5e11;  // 1 AU
+    int (*integrator)(double) = nullptr;
+    if (integrator_choice == 1){
+        integrator = &leapfrog_kdk;
+    }
+    else if (integrator_choice == 2){
+        integrator = &yoshida_fourth_order;
+    }
+    else{
+        std::cout << "Invalid integrator choice. Current choices are 1, 2, and 3." << std::endl;
+        return -1;
+    }
+
 
     int p1 = new_particle(
         1.0, M_si, 
@@ -188,18 +203,22 @@ int main(){
         0.0, 0.0, 0.0
     );
     int p2 = new_particle(
-        1.0, M_si, 
+        1.0, 0.2 * M_si, 
         -r_si, 0.0, 0.0, 
-        0.0, -0.99 * vorb_si, 0.0
+        0.0, sqrt(G_si * M_si / r_si), 0.0
     );
+
+    for (int i=0; i<10; i++){
+        double r = (0.9 + i/2000.0) * r_si;
+        int p = new_particle(
+            1.0, pow(2.0, -16.0), 
+            -r, 0.0, 0.0, 
+            0.0, sqrt(G_si * M_si / (r)), 0.0
+        );
+    }
 
     set_nb_units();
     convert_si_attr_to_nb();
-
-    double time = 0.0;
-    const double end_time_si = 10000.0 * 3600 * 24 * 365.25;  // 100 years
-    const double end_time_nb = time_si_to_nb(end_time_si);
-    const double time_step = end_time_nb / pow(2.0, 20.0);  // 32k steps per orbit
 
     get_acc_pot_coll();
     const double initial_energy = get_energy();
@@ -209,7 +228,7 @@ int main(){
     std::cout << "VELOCITY_UNIT: " << units.velocity << " m/s" << std::endl;
     std::cout << "ENERGY_UNIT: " << units.energy << " J" << std::endl;
     std::cout << "TIME_UNIT: " << units.time << " s" << std::endl;
-    std::cout << time << " " << end_time_nb << std::endl;
+    std::cout << "==============" << std::endl;
 
     const double initial_ecc = get_ecc(
         mass[p1], mass[p2], 
@@ -221,15 +240,28 @@ int main(){
         pos[p1], pos[p2], 
         vel[p1], vel[p2]
     );
-    std::cout << "Initial eccentricity: " << initial_ecc << std::endl;
-    std::cout << "Initial sma: " << initial_sma * units.length / 1.5e11 << " au" << std::endl;
+    std::cout << "Initial ecc= " << initial_ecc << std::endl;
+    std::cout << "Initial sma= " << initial_sma * units.length / 1.5e11 << " au" << std::endl;
+
+    double orbital_period = get_orbital_period(
+        mass[p1], mass[p2], initial_sma
+    );
+
+
+    double time = 0.0;
+    const double end_time_si = 1000.0 * 3600.0 * 24.0 * 365.25;
+    const double end_time_nb = time_si_to_nb(end_time_si);
+    const double time_step = orbital_period / pow(2.0, 6.0);
+    std::cout << "Number of steps: " << end_time_nb / time_step << std::endl;
 
     auto t1 = std::chrono::high_resolution_clock::now();
     while (time<end_time_nb){
-        leapfrog_kdk(time_step);
+        integrator(time_step);
         time += time_step;
     }
     auto t2 = std::chrono::high_resolution_clock::now();
+
+    get_acc_pot_coll();
     double total_energy = get_energy();
     double dx = pos[p1][0] - pos[p2][0];
     double dy = pos[p1][1] - pos[p2][1];
@@ -241,7 +273,6 @@ int main(){
     std::cout << "dE: " << (total_energy - initial_energy) / initial_energy << std::endl;
     std::cout << "Time taken: " << std::chrono::duration_cast<std::chrono::milliseconds>(t2-t1).count() << " ms" << std::endl;
 
-
     const double final_ecc = get_ecc(
         mass[p1], mass[p2], 
         pos[p1], pos[p2], 
@@ -252,7 +283,7 @@ int main(){
         pos[p1], pos[p2], 
         vel[p1], vel[p2]
     );
-    std::cout << "Final eccentricity: " << final_ecc << std::endl;
-    std::cout << "Final sma: " << final_sma * units.length / 1.5e11 << " au" << std::endl;
+    std::cout << "Final ecc= " << final_ecc << std::endl;
+    std::cout << "Final sma= " << final_sma * units.length / 1.5e11 << " au" << std::endl;
     return 0;
 }

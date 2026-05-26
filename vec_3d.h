@@ -30,7 +30,7 @@ class vec{
             return array[i];
         }
 
-        inline const double& operator[](int i) const { // Read-only operator
+        inline const double& operator[](int i) const { // Read-only operator, allows for const vec&
             return array[i];
         }
 

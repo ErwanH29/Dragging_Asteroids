@@ -3,8 +3,8 @@
 
 #include <cmath>
 
-const double G_si = 6.67428e-11;
-const double G = 1.0;  // N-body units
+constexpr double G_si = 6.67428e-11;
+constexpr double G = 1.0;  // N-body units
 
 class UnitSystem{
     public:
@@ -22,7 +22,7 @@ double mass_si_to_nb(double mass_si);
 double length_si_to_nb(double length_si);
 double velocity_si_to_nb(double velocity_si);
 double time_si_to_nb(double time_si);
-double energy_si_to_nb(double energy_so);
+double energy_si_to_nb(double energy_si);
 
 double mass_nb_to_si(double mass_nb);
 double length_nb_to_si(double length_nb);

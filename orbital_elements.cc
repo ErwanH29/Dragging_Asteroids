@@ -2,11 +2,13 @@
 #define ORBITAL_ELEMENTS
 
 #include <cmath>
+#include <math.h>
 
 #include "units.h"
 #include "vec_3d.h"
 
-vec cross_product(vec a, vec b){
+// Only seen locally, prevent overwritting if another function with same name is made
+static vec cross_product(const vec& a, const vec& b){
     return vec(
         a[1]*b[2] - a[2]*b[1],
         a[2]*b[0] - a[0]*b[2],
@@ -14,34 +16,41 @@ vec cross_product(vec a, vec b){
     );
 };
 
-const double get_orbital_energy(
+double get_orbital_period(double mass1, double mass2, double sma){
+    const double sma3 = sma * sma * sma;
+    const double pi2 = M_PI * M_PI;
+    double period_sq = 4.0 * sma3 * pi2  / (G * (mass1 + mass2));
+    return sqrt(period_sq);
+}
+
+double get_orbital_energy(
     double mass1, double mass2, 
-    vec pos1, vec pos2, 
-    vec vec1, vec vec2
+    const vec& pos1, const vec& pos2, 
+    const vec& vec1, const vec& vec2
 ){
-    vec vij = vec1 - vec2;  // Relative velocity
+    vec vij = vec1 - vec2;
     vec rij = pos1 - pos2;
     double v2 = vij * vij;
     double r = sqrt(rij * rij);
     return 0.5 * v2 - G * (mass1 + mass2) / r;
 };
 
-const double get_sma(
+double get_sma(
     double mass1, double mass2, 
-    vec pos1, vec pos2, 
-    vec vec1, vec vec2
+    const vec& pos1, const vec& pos2, 
+    const vec& vec1, const vec& vec2
 ){
-    double mu = -G * (mass1 + mass2);
+    double mu = G * (mass1 + mass2);
     double energy = get_orbital_energy(
         mass1, mass2, pos1, pos2, vec1, vec2
     );
-    return -mu / (2 * energy);
+    return -mu / (2.0 * energy);
 };
 
-const double get_ecc(
+double get_ecc(
     double mass1, double mass2, 
-    vec pos1, vec pos2, 
-    vec vec1, vec vec2
+    const vec& pos1, const vec& pos2, 
+    const vec& vec1, const vec& vec2
 ){
     vec rij = pos1 - pos2;
     vec vij = vec1 - vec2;
