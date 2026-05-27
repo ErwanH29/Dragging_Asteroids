@@ -26,7 +26,7 @@ class vec{
         // return_type operator<symbol>(arguments) const_optional {
         //     implementation
         //  }
-        inline double& operator[](int i){ // Modification operator
+        inline double& operator[](int i){ // Modification operator; return reference to array[i]
             return array[i];
         }
 
@@ -35,6 +35,12 @@ class vec{
         }
 
         double operator*(const vec& other) {
+            return array[0]*other[0] 
+              + array[1]*other[1] 
+              + array[2]*other[2];
+        }
+
+        double operator*(const vec& other) const {
             return array[0]*other[0] 
               + array[1]*other[1] 
               + array[2]*other[2];

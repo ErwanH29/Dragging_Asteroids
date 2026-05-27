@@ -21,6 +21,7 @@ Available integrator_choices:
     - Wisdam-Holman + Bulirsch-Stoer
 */
 
+
 #include <chrono>
 #include <cmath>
 #include <vector>
@@ -29,7 +30,6 @@ Available integrator_choices:
 #include "orbital_elements.h"
 #include "units.h"
 #include "vec_3d.h"
-
 
 
 int main(){
@@ -44,7 +44,7 @@ int main(){
     }
 
     system.set_eps2(0.0);
-    system.set_mass_threshold(pow(2.0, -17.0));
+    system.set_mass_threshold(pow(2.0, -15.0));
 
     int p1 = system.new_particle(
         1.0, M_si, 
@@ -52,17 +52,17 @@ int main(){
         0.0, 0.0, 0.0
     );
     int p2 = system.new_particle(
-        1.0, 0.2 * M_si, 
+        1.0, M_si, 
         -r_si, 0.0, 0.0, 
         0.0, sqrt(G_si * M_si / r_si), 0.0
     );
 
     for (int i=0; i<100; i++){
-        double r = (0.9 + i/2000.0) * r_si;
+        double r = (0.8 + i/200.0) * r_si;
         int p = system.new_particle(
             1.0, pow(2.0, -16.0), 
             -r, 0.0, 0.0, 
-            0.0, sqrt(G_si * M_si / (r)), 0.0
+            0.0, sqrt(G_si * M_si / r), 0.0
         );
     }
 
@@ -72,6 +72,7 @@ int main(){
     system.update_gravity();
     const double initial_energy = system.get_energy();
 
+    // Debug outputs
     std::cout << "MASS_UNIT: " << units.mass << " kg" << std::endl;
     std::cout << "LENGTH_UNIT: " << units.length << " m" << std::endl;
     std::cout << "VELOCITY_UNIT: " << units.velocity << " m/s" << std::endl;
@@ -89,6 +90,7 @@ int main(){
         system.pos[p1], system.pos[p2], 
         system.vel[p1], system.vel[p2]
     );
+
     std::cout << "Initial ecc= " << initial_ecc << std::endl;
     std::cout << "Initial sma= " << initial_sma * units.length / 1.5e11 << " au" << std::endl;
 
@@ -97,9 +99,10 @@ int main(){
     );
 
 
+    int counter = 0;
     double time = 0.0;
-    const double end_time_si = 1000.0 * 3600.0 * 24.0 * 365.25;
-    const double end_time_nb = time_si_to_nb(end_time_si);
+    const double end_time_si = pow(10.0, 5.0) * 3600.0 * 24.0 * 365.25;
+    const double end_time_nb = units.time_si_to_nb(end_time_si);
     const double time_step = orbital_period / pow(2.0, 6.0);
     std::cout << "Number of steps: " << end_time_nb / time_step << std::endl;
 
@@ -113,16 +116,22 @@ int main(){
             system.yoshida_eighth_order(time_step);
         }
         time += time_step;
+        counter++;
+        if (counter%100000 == 0){
+            std::cout << "\rProgress: " << (time/end_time_nb)*100 << "%" << std::flush;
+        }
     }
     auto t2 = std::chrono::high_resolution_clock::now();
 
     system.update_gravity();
+
+    // Debug outputs
     double total_energy = system.get_energy();
     double dx = system.pos[p1][0] - system.pos[p2][0];
     double dy = system.pos[p1][1] - system.pos[p2][1];
     double dz = system.pos[p1][2] - system.pos[p2][2];
     double dr2 = dx*dx + dy*dy + dz*dz;
-    dr2 = length_nb_to_si(sqrt(dr2));
+    dr2 = units.length_nb_to_si(sqrt(dr2));
 
     std::cout << " r [au]: " << dr2 / 1.5e11 << std::endl;
     std::cout << "dE: " << (total_energy - initial_energy) / initial_energy << std::endl;

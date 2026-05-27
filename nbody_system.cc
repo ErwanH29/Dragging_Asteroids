@@ -2,8 +2,6 @@
 #include "nbody_system.h"
 #include "units.h"
 
-#define _TINY_ pow(2.0, -52.0)
-
 NBodySystem::NBodySystem(){}
 
 int NBodySystem::size(){
@@ -50,14 +48,14 @@ void NBodySystem::set_nb_units(){
             }
         }
     }
-    set_units(mass_units, length_units);
+    units.set_units(mass_units, length_units);
 }
 
 void NBodySystem::convert_si_attr_to_nb(){
     int nparticles = size();
     for (int i=0; i<nparticles; i++){
-        mass[i] = mass_si_to_nb(mass[i]);
-        radius[i] = length_si_to_nb(radius[i]);
+        mass[i] = units.mass_si_to_nb(mass[i]);
+        radius[i] = units.length_si_to_nb(radius[i]);
         pos[i] = pos[i] * (1.0 / units.length);
         vel[i] = vel[i] * (1.0 / units.velocity);
     }
@@ -200,7 +198,6 @@ int NBodySystem::yoshida_fourth_order(double time_step){
     static const double d2 = w0;
     static const double d3 = w1;
 
-    int nparticles = size();
     drift(c1 * time_step);
     
     update_gravity();

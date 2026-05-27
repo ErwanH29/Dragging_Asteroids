@@ -5,7 +5,6 @@
 #include <vector>
 #include "vec_3d.h"
 
-
 template <typename T>
 using dyn_arr = std::vector<T>;
 
