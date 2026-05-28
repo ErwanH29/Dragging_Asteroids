@@ -4,33 +4,8 @@
 
 NBodySystem::NBodySystem(){}
 
-int NBodySystem::size(){
+int NBodySystem::size()const{
     return radius.size();
-}
-
-// Setters and getters for static attributes
-void NBodySystem::set_eps2(double _eps2){
-    eps2 = _eps2;
-}
-
-double NBodySystem::get_eps2(){
-    return eps2;
-}
-
-void NBodySystem::set_mass_threshold(double _mass_threshold){
-    mass_threshold = _mass_threshold;
-}
-
-double NBodySystem::get_mass_threshold(){
-    return mass_threshold;
-}
-
-void NBodySystem::set_integrator_choice(int _integrator_choice){
-    integrator_choice = _integrator_choice;
-}
-
-int NBodySystem::get_integrator_choice(){
-    return integrator_choice;
 }
 
 // Unit conversions
@@ -43,15 +18,13 @@ void NBodySystem::set_nb_units(){
         for (int j=i+1; j<nparticles; j++){
             vec drij = pos[i] - pos[j];  // Using overloaded - operator
             double dr = sqrt(drij * drij);
-            if (dr > length_units){
-                length_units = dr;
-            }
+            length_units = std::max(length_units, dr);
         }
     }
     units.set_units(mass_units, length_units);
 }
 
-void NBodySystem::convert_si_attr_to_nb(){
+void NBodySystem::convert_si_to_nb(){
     int nparticles = size();
     for (int i=0; i<nparticles; i++){
         mass[i] = units.mass_si_to_nb(mass[i]);
@@ -62,7 +35,7 @@ void NBodySystem::convert_si_attr_to_nb(){
 }
 
 // Add a new particle to the system
-int NBodySystem::new_particle(
+void NBodySystem::new_particle(
     double _radius,
     double _mass, 
     double x, 
@@ -72,9 +45,10 @@ int NBodySystem::new_particle(
     double vy, 
     double vz
 ){
-    int id = size();
     static const vec null_acc = vec(0.0, 0.0, 0.0);
-
+    if (_mass <= _TINY_){
+        _mass = 0.0;
+    }
     mass.push_back(_mass);
     radius.push_back(_radius);
     pos.push_back(vec(x, y, z));
@@ -86,8 +60,35 @@ int NBodySystem::new_particle(
     } else {
         type.push_back(0);
     }
-    return id;
 }
+
+
+
+// Setters and getters
+void NBodySystem::set_eps2(double _eps2){
+    eps2 = _eps2;
+}
+
+void NBodySystem::set_integrator_choice(int _integrator_choice){
+    integrator_choice = _integrator_choice;
+}
+
+void NBodySystem::set_mass_threshold(double _mass_threshold){
+    mass_threshold = _mass_threshold;
+}
+
+double NBodySystem::get_eps2() const {
+    return eps2;
+}
+
+double NBodySystem::get_mass_threshold() const{
+    return mass_threshold;
+}
+
+int NBodySystem::get_integrator_choice() const{
+    return integrator_choice;
+}
+
 
 
 // Integration methods
@@ -104,55 +105,111 @@ double NBodySystem::get_energy(){
     return ke + pe;
 }
 
-int NBodySystem::update_gravity(){
+void NBodySystem::move_to_center(){
+    static vec zero_vec = vec(0.0, 0.0, 0.0);
+    vec center_of_mass_pos = zero_vec;
+    vec center_of_mass_vel = zero_vec;
+    
+    double total_mass = 0.0;
+
     int nparticles = size();
-    static vec zero_vec = vec(0.0, 0.0, 0.0);  // Initialised at first call, and remembered throughout
     for (int i=0; i<nparticles; i++){
+        const double mass_i = mass[i];
+        if (mass[i] <= _TINY_) continue;
+        total_mass += mass[i];
+        center_of_mass_pos += pos[i] * mass_i;
+        center_of_mass_vel += vel[i] * mass_i;
+    }
+
+    center_of_mass_pos = center_of_mass_pos * (1.0 / total_mass);
+    center_of_mass_vel = center_of_mass_vel * (1.0 / total_mass);
+
+    for (int i=0; i<nparticles; i++){
+        pos[i] -= center_of_mass_pos;
+        vel[i] -= center_of_mass_vel;
+    }
+}
+
+void NBodySystem::interact_pair(int i, int j){
+        const double dx = pos[i][0] - pos[j][0];
+        const double dy = pos[i][1] - pos[j][1];
+        const double dz = pos[i][2] - pos[j][2];
+
+        double dr2 = dx*dx + dy*dy + dz*dz;
+
+        const double coll_rad = radius[i] + radius[j];
+        if (dr2 <= coll_rad * coll_rad){
+            return;
+        }
+
+        dr2 += eps2;
+
+        const double dr = std::sqrt(dr2);
+        const double inv_dr = 1.0 / dr;
+        const double inv_dr3 = inv_dr / dr2;
+
+        const double fac = -G * inv_dr3;
+
+        const double mi = mass[i];
+        const double mj = mass[j];
+
+        if (mj > _TINY_){
+            pot[i] -= G * mj * inv_dr;
+
+            const double mj_fac = mj * fac;
+            acc[i][0] += mj_fac * dx;
+            acc[i][1] += mj_fac * dy;
+            acc[i][2] += mj_fac * dz;
+        }
+
+        if (mi > _TINY_){
+            pot[j] -= G * mi * inv_dr;
+
+            const double mi_fac = mi * fac;
+            acc[j][0] -= mi_fac * dx;
+            acc[j][1] -= mi_fac * dy;
+            acc[j][2] -= mi_fac * dz;
+        }
+}
+
+int NBodySystem::update_gravity(){
+    const int nparticles = size();
+
+    static const vec zero_vec = vec(0.0, 0.0, 0.0);
+
+    for (int i = 0; i < nparticles; i++){
         acc[i] = zero_vec;
         pot[i] = 0.0;
     }
 
-    for (int i=0; i<nparticles; i++){
-        const vec& pos_i = pos[i];
-        double mass_i = mass[i];
-        double rad_i = radius[i];
-        int type_i = type[i];
-        for (int j=i+1; j<nparticles; j++){  // Current symmetric scheme can't be parallelised
-            double mass_j = mass[j];
-            // Test particles don't affect one another
-            if ((type_i == 0) && (type[j] == 0)){
-                continue;
-            }
+    std::vector<int> massive;
+    std::vector<int> massless;
 
-            vec rij = pos_i - pos[j];  // Using overloaded - operator
-            double dr2 = rij * rij;
-            double coll_rad = rad_i + radius[j];
-            if (dr2 <= coll_rad * coll_rad){  // Handle collision (not yet implemented)
-                continue;
-            }
+    massive.reserve(nparticles);
+    massless.reserve(nparticles);
 
-            dr2 += eps2;  // Softening to avoid singularities
-            double dr = sqrt(dr2);
-            double dr3 = dr * dr2;
-
-            //Compute acc. and pot.
-            double grav_factor = -G / dr3;
-            if (mass_j>_TINY_){
-                pot[i] -= G * mass_j / dr;
-                double mj_factor = mass_j * grav_factor; // Order of operations can change results
-                for (int k=0; k<NDIM; k++){
-                    acc[i][k] += mj_factor * rij[k];
-                }
-            }
-            if (mass_i>_TINY_){
-                pot[j] -= G * mass_i / dr;
-                double mi_factor = mass_i * grav_factor;
-                for (int k=0; k<NDIM; k++){
-                    acc[j][k] -= mi_factor * rij[k];  // drji = -drij
-                }
-            }
+    for (int i = 0; i < nparticles; i++){
+        if (type[i] == 1){
+            massive.push_back(i);
+        } else {
+            massless.push_back(i);
         }
     }
+
+    // Massive-massive interactions
+    for (std::size_t a = 0; a < massive.size(); a++){
+        for (std::size_t b = a + 1; b < massive.size(); b++){
+            interact_pair(massive[a], massive[b]);
+        }
+    }
+
+    // Massive-massless interactions
+    for (int i : massive){
+        for (int j : massless){
+            interact_pair(i, j);
+        }
+    }
+
     return 0;
 }
 
@@ -176,8 +233,11 @@ int NBodySystem::drift(double time_step){
     return 0;
 }
 
+
+
 // Integration schemes
 int NBodySystem::leapfrog_kdk(double time_step){
+    // move_to_center();
     kick(0.5 * time_step);
     drift(time_step);
     update_gravity();
@@ -198,6 +258,7 @@ int NBodySystem::yoshida_fourth_order(double time_step){
     static const double d2 = w0;
     static const double d3 = w1;
 
+    // move_to_center();
     drift(c1 * time_step);
     
     update_gravity();
@@ -230,13 +291,18 @@ int NBodySystem::yoshida_eighth_order(double time_step){
         w7, w6, w5, w4, w3, w2, w1, w0, w1, w2, w3, w4, w5, w6, w7
     };
 
+    // move_to_center();
+    drift(0.5 * w_seq[0] * time_step);
     for (int i = 0; i < 15; i++) {
-        drift(0.5 * w_seq[i] * time_step);
 
         update_gravity();
         kick(w_seq[i] * time_step);
-
-        drift(0.5 * w_seq[i] * time_step);
+        if (i < 14){
+            drift(0.5 * (w_seq[i] + w_seq[i+1]) * time_step);
+        }
+        else {
+            drift(0.5 * w_seq[i] * time_step);
+        }
     }
 
     return 0;

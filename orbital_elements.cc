@@ -50,7 +50,7 @@ double get_ecc(
 ){
     const vec rij = pos1 - pos2;
     const vec vij = vec1 - vec2;
-    const vec h = cross_product(rij, vij);  // Specific angular momentum
+    const vec h = cross_product(rij, vij);
     const double h2 = h * h;
     const double eps = get_orbital_energy(
         mass1, mass2, pos1, pos2, vec1, vec2

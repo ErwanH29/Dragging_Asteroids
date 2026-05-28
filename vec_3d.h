@@ -1,9 +1,9 @@
 // Class for storing data
 
-#include <iostream>
-
 #ifndef VEC_3D
 #define VEC_3D
+
+#include <iostream>
 
 class vec{
     private:
@@ -26,18 +26,13 @@ class vec{
         // return_type operator<symbol>(arguments) const_optional {
         //     implementation
         //  }
-        inline double& operator[](int i){ // Modification operator; return reference to array[i]
+        inline double& operator[](int i){
             return array[i];
         }
-
-        inline const double& operator[](int i) const { // Read-only operator, allows for const vec&
+        
+        // First const is return type, second const is so function doesn't modify object
+        inline const double& operator[](int i) const {
             return array[i];
-        }
-
-        double operator*(const vec& other) {
-            return array[0]*other[0] 
-              + array[1]*other[1] 
-              + array[2]*other[2];
         }
 
         double operator*(const vec& other) const {
@@ -46,7 +41,15 @@ class vec{
               + array[2]*other[2];
         }
 
-        inline vec operator-(const vec& other) const {
+        vec operator*(double scalar) const {
+            return vec(
+                scalar * array[0],
+                scalar * array[1],
+                scalar * array[2]
+            );
+        }
+
+        vec operator-(const vec& other) const {
             return vec(
                 array[0] - other[0],
                 array[1] - other[1],
@@ -54,12 +57,33 @@ class vec{
             );
         }
 
-        inline vec operator*(double scalar) const {
+        vec operator+(double scalar) const {
             return vec(
-                scalar * array[0],
-                scalar * array[1],
-                scalar * array[2]
+                scalar + array[0],
+                scalar + array[1],
+                scalar + array[2]
             );
+        }
+
+        vec& operator+=(const vec& other){
+            array[0] += other[0];
+            array[1] += other[1];
+            array[2] += other[2];
+            return *this;  // Return pointer since modifying reference
+        }
+
+        vec& operator-=(const vec& other){
+            array[0] -= other[0];
+            array[1] -= other[1];
+            array[2] -= other[2];
+            return *this;
+        }
+
+        inline vec& operator*=(double scalar){
+            array[0] *= scalar;
+            array[1] *= scalar;
+            array[2] *= scalar;
+            return *this;
         }
 
 };

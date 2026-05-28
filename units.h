@@ -3,7 +3,7 @@
 
 #include <cmath>
 
-#define _TINY_ pow(2.0, -52.0)
+inline double _TINY_ = pow(2.0, -52.0);
 constexpr double pi2 = M_PI * M_PI;
 constexpr double G_si = 6.67428e-11;
 constexpr double G = 1.0;  // N-body units
@@ -31,7 +31,7 @@ class UnitSystem{
         double energy_nb_to_si(double energy_nb);
 };
 
-extern UnitSystem units;  // Make it global, one instance
+extern UnitSystem units;  // Make it global, one instance exists in .cc
 
 
 #endif

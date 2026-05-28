@@ -13,32 +13,25 @@ class NBodySystem{
         static constexpr int NDIM = 3;
         double eps2 = 0.0;
         double mass_threshold = pow(2.0, -16.0);
-        int integrator_choice = 1; 
+        int integrator_choice; 
 
     public:
-
-        dyn_arr<double> mass;
-        dyn_arr<double> pot;
-        dyn_arr<double> radius;
-        dyn_arr<int> type;
-        dyn_arr<vec> pos;
-        dyn_arr<vec> vel;
-        dyn_arr<vec> acc;
-
         NBodySystem();
 
-        void set_eps2(double _eps2);
-        double get_eps2();
+        dyn_arr<double> mass, pot, radius;
+        dyn_arr<int> type;
+        dyn_arr<vec> pos, vel, acc;
 
-        void set_mass_threshold(double _mass_threshold);
-        double get_mass_threshold();
+        int size() const;
+        void set_eps2(double _eps2);
+        double get_eps2() const;
 
         void set_integrator_choice(int _integrator_choice);
-        int get_integrator_choice();
+        void set_mass_threshold(double _mass_threshold);
+        int get_integrator_choice() const;
+        double get_mass_threshold() const;
 
-        int size();
-
-        int new_particle(
+        void new_particle(
             double _radius,
             double _mass, 
             double x, 
@@ -50,8 +43,10 @@ class NBodySystem{
         );
 
         void set_nb_units();
-        void convert_si_attr_to_nb();
+        void convert_si_to_nb();
 
+        void interact_pair(int i, int j);
+        void move_to_center();
         double get_energy();
         int update_gravity();
         int kick(double time_step);
