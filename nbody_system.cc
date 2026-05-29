@@ -77,15 +77,15 @@ void NBodySystem::set_mass_threshold(double _mass_threshold){
     mass_threshold = _mass_threshold;
 }
 
-double NBodySystem::get_eps2() const {
+double NBodySystem::get_eps2() const {  //When reading, use const reference to avoid unnecessary copying
     return eps2;
 }
 
-double NBodySystem::get_mass_threshold() const{
+double NBodySystem::get_mass_threshold() const {
     return mass_threshold;
 }
 
-int NBodySystem::get_integrator_choice() const{
+int NBodySystem::get_integrator_choice() const {
     return integrator_choice;
 }
 

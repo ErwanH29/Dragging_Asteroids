@@ -43,18 +43,33 @@ int main(){
     system.set_eps2(0.0);
     system.set_mass_threshold(pow(2.0, -15.0));
 
-    system.new_particle(
+    system.new_particle(  // Sun
         1.0, M_si, 
         0.0, 0.0, 0.0, 
         0.0, 0.0, 0.0
     );
-    system.new_particle(
-        1.0, M_si, 
-        -r_si, 0.0, 0.0, 
-        0.0, sqrt(G_si * M_si / r_si), 0.0
+    system.new_particle( // Jupiter
+        1.0, 1.89813e27, 
+        5.4 * r_si, 0.0, 0.0, 
+        0.0, sqrt(G_si * M_si / (5.4 * r_si)), 0.0
     );
-    for (int i=0; i<100; i++){
-        double r = (0.8 + i/200.0) * r_si;
+    system.new_particle( // Saturn
+        1.0, 5.683e26, 
+        8.7 * r_si, 0.0, 0.0, 
+        0.0, sqrt(G_si * M_si / (8.7 * r_si)), 0.0
+    );
+    system.new_particle( // Uranus
+        1.0, 8.681e25, 
+        15.0 * r_si, 0.0, 0.0, 
+        0.0, sqrt(G_si * M_si / ( 15.0 * r_si)), 0.0
+    );
+    system.new_particle( // Neptune
+        1.0, 1.024e26, 
+        28.0 * r_si, 0.0, 0.0, 
+        0.0, sqrt(G_si * M_si / (28.0 * r_si)), 0.0
+    );
+    for (int i=0; i<0; i++){
+        double r = 20 + i/10.0; // 20 to 30 AU
         system.new_particle(
             1.0, pow(2.0, -16.0), 
             -r, 0.0, 0.0, 
@@ -79,30 +94,50 @@ if (1){
     std::cout << "==============" << std::endl;
 }
 
+    double min_sma = std::numeric_limits<double>::max();
+    double target_mass;
+    for (int i=1; i<5; i++){
+        const double initial_sma = get_sma(
+            system.mass[0], system.mass[i], 
+            system.pos[0], system.pos[i], 
+            system.vel[0], system.vel[i]
+        );
+        if (initial_sma < min_sma){
+            min_sma = initial_sma;
+            target_mass = system.mass[i];
+        }
+    }
+
+if (1){
+for (int i=1; i<5; i++){
     const double initial_ecc = get_ecc(
-        system.mass[0], system.mass[1], 
-        system.pos[0], system.pos[1], 
-        system.vel[0], system.vel[1]
+        system.mass[0], system.mass[i], 
+        system.pos[0], system.pos[i], 
+        system.vel[0], system.vel[i]
     );
     const double initial_sma = get_sma(
-        system.mass[0], system.mass[1], 
-        system.pos[0], system.pos[1], 
-        system.vel[0], system.vel[1]
+        system.mass[0], system.mass[i], 
+        system.pos[0], system.pos[i], 
+        system.vel[0], system.vel[i]
     );
-
+    std::cout << "==============" << std::endl;
+    std::cout << "Particle mass=" << system.mass[i] << ": " << std::endl;
     std::cout << "Initial ecc= " << initial_ecc << std::endl;
     std::cout << "Initial sma= " << initial_sma * units.length / 1.5e11 << " au" << std::endl;
+}
+}
 
     double orbital_period = get_orbital_period(
-        system.mass[0], system.mass[1], initial_sma
+        system.mass[0], target_mass, min_sma
     );
+    std::cout << "Orbital period: " << orbital_period * units.time / (3600.0 * 24.0 * 365.25) << " years" << std::endl;
 
 
     int counter = 0;
     double time = 0.0;
-    const double end_time_si = pow(10.0, 3.0) * 3600.0 * 24.0 * 365.25;
+    const double end_time_si = pow(10.0, 9.0) * 3600.0 * 24.0 * 365.25;
     const double end_time_nb = units.time_si_to_nb(end_time_si);
-    const double time_step = orbital_period / pow(2.0, 5.0);
+    const double time_step = orbital_period / pow(2.0, 4.0);
     const int n_steps = end_time_nb / time_step;
     std::cout << "Number of steps: " << n_steps << std::endl;
 
@@ -117,13 +152,15 @@ if (1){
         }
         time += time_step;
         counter++;
-        if (counter%100000 == 0){
+        if (counter%10000000 == 0){
             std::cout << "\rProgress: " << (time/end_time_nb)*100 << "%" << std::flush;
         }
     }
     auto t2 = std::chrono::high_resolution_clock::now();
 
     system.update_gravity();
+
+    std::cout << "Time taken: " << std::chrono::duration_cast<std::chrono::milliseconds>(t2-t1).count() << " ms" << std::endl;
 
 
 if (1){
@@ -137,25 +174,28 @@ if (1){
 
     std::cout << " r [au]: " << dr2 / 1.5e11 << std::endl;
     std::cout << "dE: " << (total_energy - initial_energy) / initial_energy << std::endl;
-}
 
-
-    std::cout << "Time taken: " << std::chrono::duration_cast<std::chrono::milliseconds>(t2-t1).count() << " ms" << std::endl;
-
-    const double final_ecc = get_ecc(
-        system.mass[0], system.mass[1], 
-        system.pos[0], system.pos[1], 
-        system.vel[0], system.vel[1]
-    );
-    const double final_sma = get_sma(
-        system.mass[0], system.mass[1], 
-        system.pos[0], system.pos[1], 
-        system.vel[0], system.vel[1]
-    );
-    std::cout << "Final ecc= " << final_ecc << std::endl;
-    std::cout << "Final sma= " << final_sma * units.length / 1.5e11 << " au" << std::endl;
+    for (int i=1; i<5; i++){
+        const double final_ecc = get_ecc(
+            system.mass[0], system.mass[i], 
+            system.pos[0], system.pos[i], 
+            system.vel[0], system.vel[i]
+        );
+        const double final_sma = get_sma(
+            system.mass[0], system.mass[i], 
+            system.pos[0], system.pos[i], 
+            system.vel[0], system.vel[i]
+        );
+        std::cout << "==============" << std::endl;
+        std::cout << "Particle mass=" << system.mass[i] << ": " << std::endl;
+        std::cout << "Final ecc= " << final_ecc << std::endl;
+        std::cout << "Final sma= " << final_sma * units.length / 1.5e11 << " au" << std::endl;
+    }
     for (int i=0; i<system.size(); i++){
         std::cout << "Particle " << i << ": x-pos = " << system.pos[i][0] << " m" << std::endl;
     }
+}
+
+
     return 0;
 }
