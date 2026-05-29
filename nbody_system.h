@@ -13,7 +13,9 @@ class NBodySystem{
         static constexpr int NDIM = 3;
         double eps2 = 0.0;
         double mass_threshold = pow(2.0, -16.0);
-        int integrator_choice; 
+        double eta = pow(2.0, -4.0);
+        int integrator_choice, collision_detection;
+        int coll_counter = 0;
 
     public:
         NBodySystem();
@@ -23,11 +25,16 @@ class NBodySystem{
         dyn_arr<vec> pos, vel, acc;
 
         int size() const;
-        void set_eps2(double _eps2);
-        double get_eps2() const;
 
+        void set_collision_detection(bool _collision_detection);
+        void set_eps2(double _eps2);
+        void set_eta(double _eta);
         void set_integrator_choice(int _integrator_choice);
         void set_mass_threshold(double _mass_threshold);
+
+        bool get_collision_detection() const;
+        double get_eps2() const;
+        double get_eta() const;
         int get_integrator_choice() const;
         double get_mass_threshold() const;
 
@@ -41,13 +48,19 @@ class NBodySystem{
             double vy, 
             double vz
         );
+        void remove_particle(int i);
 
         void set_nb_units();
         void convert_si_to_nb();
 
-        void interact_pair(int i, int j);
+        bool detect_collision();
+        void resolve_collision(int i, int j);
+
         void move_to_center();
         double get_energy();
+        int get_ncoll() const;
+
+        void interact_pair(int i, int j);
         int update_gravity();
         int kick(double time_step);
         int drift(double time_step);

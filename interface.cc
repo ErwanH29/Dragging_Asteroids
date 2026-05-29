@@ -16,7 +16,13 @@ Available integrator_choices:
     - Second-order verlet leapfrog method       22/05/2026
     - Fourth-order Yoshida integrator_choice    26/05/2026
     - Eighth-order Yoshida integrator_choice    26/05/2026
-    - Wisdam-Holman + Bulirsch-Stoer
+
+Still to do:
+    - Parallelise computations
+    - Resolving collisions in a more optimised fashion
+    - Read AMUSE particle set
+    - Output phase-space coordinates
+    - Output collision information
 */
 
 
@@ -40,39 +46,46 @@ int main(){
     }
 
     NBodySystem system;
+    system.set_eta(pow(2.0, -7.0));
     system.set_eps2(0.0);
     system.set_mass_threshold(pow(2.0, -15.0));
+    system.set_collision_detection(0);
 
     system.new_particle(  // Sun
-        1.0, M_si, 
+        697500000, M_si, 
         0.0, 0.0, 0.0, 
         0.0, 0.0, 0.0
     );
     system.new_particle( // Jupiter
-        1.0, 1.89813e27, 
+        142984000 / 2.0, 
+        1.89813e27, 
         5.4 * r_si, 0.0, 0.0, 
         0.0, sqrt(G_si * M_si / (5.4 * r_si)), 0.0
     );
     system.new_particle( // Saturn
-        1.0, 5.683e26, 
+        120536000 / 2.0, 
+        5.683e26, 
         8.7 * r_si, 0.0, 0.0, 
         0.0, sqrt(G_si * M_si / (8.7 * r_si)), 0.0
     );
     system.new_particle( // Uranus
-        1.0, 8.681e25, 
+        51118000 / 2.0, 
+        8.681e25, 
         15.0 * r_si, 0.0, 0.0, 
         0.0, sqrt(G_si * M_si / ( 15.0 * r_si)), 0.0
     );
     system.new_particle( // Neptune
-        1.0, 1.024e26, 
+        49528000 / 2.0, 
+        1.024e26, 
         28.0 * r_si, 0.0, 0.0, 
         0.0, sqrt(G_si * M_si / (28.0 * r_si)), 0.0
     );
     for (int i=0; i<0; i++){
-        double r = 20 + i/10.0; // 20 to 30 AU
+        double r = (5.35 + i/10000.0) * r_si; // 20 to 30 AU
         system.new_particle(
-            1.0, pow(2.0, -16.0), 
-            -r, 0.0, 0.0, 
+            1000000 / 2.0, 
+            pow(2.0, -16.0), 
+            r, 0.0, 0.0, 
             0.0, sqrt(G_si * M_si / r), 0.0
         );
     }
@@ -135,9 +148,9 @@ for (int i=1; i<5; i++){
 
     int counter = 0;
     double time = 0.0;
-    const double end_time_si = pow(10.0, 9.0) * 3600.0 * 24.0 * 365.25;
+    const double end_time_si = pow(10.0, 5.0) * 3600.0 * 24.0 * 365.25;
     const double end_time_nb = units.time_si_to_nb(end_time_si);
-    const double time_step = orbital_period / pow(2.0, 4.0);
+    const double time_step = orbital_period * system.get_eta();
     const int n_steps = end_time_nb / time_step;
     std::cout << "Number of steps: " << n_steps << std::endl;
 
@@ -174,6 +187,7 @@ if (1){
 
     std::cout << " r [au]: " << dr2 / 1.5e11 << std::endl;
     std::cout << "dE: " << (total_energy - initial_energy) / initial_energy << std::endl;
+    std::cout << "Ncoll: " << system.get_ncoll() << std::endl;
 
     for (int i=1; i<5; i++){
         const double final_ecc = get_ecc(

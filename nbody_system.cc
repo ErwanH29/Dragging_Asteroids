@@ -1,12 +1,14 @@
 #include <cmath>
 #include "nbody_system.h"
 #include "units.h"
+#include "vec_3d.h"
 
 NBodySystem::NBodySystem(){}
 
 int NBodySystem::size()const{
     return radius.size();
 }
+
 
 // Unit conversions
 void NBodySystem::set_nb_units(){
@@ -34,7 +36,7 @@ void NBodySystem::convert_si_to_nb(){
     }
 }
 
-// Add a new particle to the system
+// Particle manipulation
 void NBodySystem::new_particle(
     double _radius,
     double _mass, 
@@ -62,11 +64,29 @@ void NBodySystem::new_particle(
     }
 }
 
+void NBodySystem::remove_particle(int i){
+    radius.erase(radius.begin() + i);
+    mass.erase(mass.begin() + i);
+    pos.erase(pos.begin() + i);
+    vel.erase(vel.begin() + i);
+    acc.erase(acc.begin() + i);
+    pot.erase(pot.begin() + i);
+    type.erase(type.begin() + i);
+}
 
 
-// Setters and getters
+
+// Setters
+void NBodySystem::set_collision_detection(bool _collision_detection){
+    collision_detection = _collision_detection;
+}
+
 void NBodySystem::set_eps2(double _eps2){
     eps2 = _eps2;
+}
+
+void NBodySystem::set_eta(double _eta){
+    eta = _eta;
 }
 
 void NBodySystem::set_integrator_choice(int _integrator_choice){
@@ -77,8 +97,18 @@ void NBodySystem::set_mass_threshold(double _mass_threshold){
     mass_threshold = _mass_threshold;
 }
 
+
+// Getters
+bool NBodySystem::get_collision_detection() const {
+    return collision_detection;
+}
+
 double NBodySystem::get_eps2() const {  //When reading, use const reference to avoid unnecessary copying
     return eps2;
+}
+
+double NBodySystem::get_eta() const {
+    return eta;
 }
 
 double NBodySystem::get_mass_threshold() const {
@@ -89,9 +119,12 @@ int NBodySystem::get_integrator_choice() const {
     return integrator_choice;
 }
 
+int NBodySystem::get_ncoll() const {
+    return coll_counter;
+}
 
 
-// Integration methods
+// Helper functions
 double NBodySystem::get_energy(){
     double ke = 0.0;
     double pe = 0.0;
@@ -130,6 +163,77 @@ void NBodySystem::move_to_center(){
     }
 }
 
+
+// Handle collisions
+void NBodySystem::resolve_collision(int i, int j){
+    double new_radius = std::cbrt(  // Assume constant density
+        radius[i]*radius[i]*radius[i] +
+        radius[j]*radius[j]*radius[j]
+    );
+    double new_mass = mass[i] + mass[j];
+    vec new_vel = (mass[i]*vel[i] + mass[j]*vel[j]) / new_mass;
+    vec new_pos = (mass[i]*pos[i] + mass[j]*pos[j]) / new_mass;
+
+    NBodySystem::new_particle(
+        new_radius,
+        new_mass,
+        new_pos[0],
+        new_pos[1],
+        new_pos[2],
+        new_vel[0],
+        new_vel[1],
+        new_vel[2]
+    );
+
+    if (i>j){
+        NBodySystem::remove_particle(i);
+        NBodySystem::remove_particle(j);
+    }
+    else{
+        NBodySystem::remove_particle(j);
+        NBodySystem::remove_particle(i);
+    }
+
+    coll_counter++;
+}
+
+bool NBodySystem::detect_collision(){
+    const int nparticles = size();
+
+    for (int i = 0; i < nparticles; i++){
+        for (int j = i + 1; j < nparticles; j++){
+
+            // Only check collisions involving at least one massive particle
+            if (mass[i] < mass_threshold && mass[j] < mass_threshold){
+                continue;
+            }
+
+            const double dx = pos[i][0] - pos[j][0];
+            const double dy = pos[i][1] - pos[j][1];
+            const double dz = pos[i][2] - pos[j][2];
+
+            const double dr2 = dx*dx + dy*dy + dz*dz;
+            const double coll_rad = radius[i] + radius[j];
+
+            if (dr2 <= coll_rad * coll_rad){
+                resolve_collision(i, j);
+
+                std::cout << "COLLISION " << coll_counter
+                          << " DETECTED: Nparticles: "
+                          << size() << std::endl;
+                std::cout << "NEW MASS: " << mass.back() << std::endl;
+
+                return true;
+            }
+        }
+    }
+
+    return false;
+}
+
+
+
+// Gravity calculations
 void NBodySystem::interact_pair(int i, int j){
         const double dx = pos[i][0] - pos[j][0];
         const double dy = pos[i][1] - pos[j][1];
@@ -137,10 +241,8 @@ void NBodySystem::interact_pair(int i, int j){
 
         double dr2 = dx*dx + dy*dy + dz*dz;
 
-        const double coll_rad = radius[i] + radius[j];
-        if (dr2 <= coll_rad * coll_rad){
-            return;
-        }
+        // std::cout << "Mass[i]: " << mass[i] << std::endl;
+        // std::cout << "Mass[j]: " << mass[j] << std::endl;
 
         dr2 += eps2;
 
@@ -173,10 +275,14 @@ void NBodySystem::interact_pair(int i, int j){
 }
 
 int NBodySystem::update_gravity(){
+    if (collision_detection){
+        while (detect_collision()){
+            //Resolve collision in step until no more collisions
+        }
+    }
     const int nparticles = size();
 
     static const vec zero_vec = vec(0.0, 0.0, 0.0);
-
     for (int i = 0; i < nparticles; i++){
         acc[i] = zero_vec;
         pot[i] = 0.0;
@@ -184,7 +290,7 @@ int NBodySystem::update_gravity(){
 
     std::vector<int> massive;
     std::vector<int> massless;
-
+    
     massive.reserve(nparticles);
     massless.reserve(nparticles);
 

@@ -41,11 +41,35 @@ class vec{
               + array[2]*other[2];
         }
 
-        vec operator*(double scalar) const {
+        vec operator*(double scalar) const { // vec * double
             return vec(
                 scalar * array[0],
                 scalar * array[1],
                 scalar * array[2]
+            );
+        }
+
+        vec operator/(double scalar) const { // vec / double
+            return vec(
+                array[0] / scalar,
+                array[1] / scalar,
+                array[2] / scalar
+            );
+        }
+
+        vec operator+(double scalar) const {
+            return vec(
+                scalar + array[0],
+                scalar + array[1],
+                scalar + array[2]
+            );
+        }
+        
+        vec operator+(const vec& other) const {
+            return vec(
+                array[0] + other[0],
+                array[1] + other[1],
+                array[2] + other[2]
             );
         }
 
@@ -57,12 +81,11 @@ class vec{
             );
         }
 
-        vec operator+(double scalar) const {
-            return vec(
-                scalar + array[0],
-                scalar + array[1],
-                scalar + array[2]
-            );
+        inline vec& operator*=(double scalar){
+            array[0] *= scalar;
+            array[1] *= scalar;
+            array[2] *= scalar;
+            return *this;
         }
 
         vec& operator+=(const vec& other){
@@ -79,13 +102,13 @@ class vec{
             return *this;
         }
 
-        inline vec& operator*=(double scalar){
-            array[0] *= scalar;
-            array[1] *= scalar;
-            array[2] *= scalar;
-            return *this;
-        }
-
 };
+
+
+// Outside the class, since overloading within class means class is on LHS
+inline vec operator*(double scalar, const vec& v){
+    return v * scalar;
+}
+
 
 #endif
