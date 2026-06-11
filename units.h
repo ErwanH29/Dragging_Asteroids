@@ -7,6 +7,7 @@ inline double _TINY_ = pow(2.0, -52.0);
 constexpr double pi2 = M_PI * M_PI;
 constexpr double G_si = 6.67428e-11;
 constexpr double G = 1.0;  // N-body units
+constexpr double s_to_yr = 1.0 / (3600.0 * 24.0 * 365.25);
 
 class UnitSystem{
     public:

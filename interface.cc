@@ -30,6 +30,7 @@ Still to do:
 #include <cmath>
 #include <vector>
 
+#include "handle_files.h"
 #include "nbody_system.h"
 #include "orbital_elements.h"
 #include "units.h"
@@ -165,8 +166,9 @@ for (int i=1; i<5; i++){
         }
         time += time_step;
         counter++;
-        if (counter%10000000 == 0){
+        if (counter%10000 == 0){
             std::cout << "\rProgress: " << (time/end_time_nb)*100 << "%" << std::flush;
+            record_snapshot(system, units.time_nb_to_si(time), "snapshot.csv");
         }
     }
     auto t2 = std::chrono::high_resolution_clock::now();

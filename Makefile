@@ -3,7 +3,7 @@ CXXFLAGS = -std=c++17 -O3 -Wall -Wextra -pedantic
 
 TARGET = symplectic_asteroids
 
-SRCS = interface.cc nbody_system.cc orbital_elements.cc units.cc
+SRCS = interface.cc nbody_system.cc orbital_elements.cc units.cc handle_files.cc
 OBJS = $(SRCS:.cc=.o)
 
 $(TARGET): $(OBJS)
